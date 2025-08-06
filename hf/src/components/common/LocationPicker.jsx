@@ -2,14 +2,18 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Card } from 'react-bootstrap';
+
+// Fix for leaflet marker icons (ES modules version)
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Fix default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png')
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
 });
 
 const LocationPicker = ({ position, setPosition }) => {
@@ -26,25 +30,24 @@ const LocationPicker = ({ position, setPosition }) => {
   };
 
   return (
-    <Card className="mb-3">
-      <Card.Body className="p-0" style={{ height: '300px' }}>
-        <MapContainer
-          center={position || [-1.2921, 36.8219]}
-          zoom={13}
-          style={{ height: '100%', width: '100%' }}
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <LocationMarker />
-        </MapContainer>
-      </Card.Body>
+    <div style={{ height: '300px', width: '100%' }}>
+      <MapContainer
+        center={position || [-1.2921, 36.8219]} // Default to Nairobi coordinates
+        zoom={13}
+        style={{ height: '100%', width: '100%' }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        <LocationMarker />
+      </MapContainer>
       {position && (
-        <Card.Footer className="small">
+        <div className="mt-2 small">
           Selected: {position.lat.toFixed(4)}, {position.lng.toFixed(4)}
-        </Card.Footer>
+        </div>
       )}
-    </Card>
+    </div>
   );
 };
 

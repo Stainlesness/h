@@ -8,14 +8,16 @@ import HomePage from './pages/HomePage';
 import Login from './components/auth/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import BusinessPage from './pages/BusinessPage';
+import BusinessForm from './components/business/BusinessForm';
 import ProductPage from './pages/ProductPage';
-import ServicePage from './pages/ServicePage';
+//import ServicePage from './pages/ServicePage';
 import ProfilePage from './pages/ProfilePage';
 import RegisterPage from './pages/RegisterPage';
 import NotFoundPage from './pages/NotFoundPage';
 import BusinessDetailPage from './pages/BusinessDetailPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
+import ProductForm from './components/product/ProductForm';
 
 const App = () => {
   return (
@@ -68,22 +70,22 @@ const App = () => {
                 } />
 
                 {/* Service Routes */}
-                <Route path="/services" element={
+                {/* <Route path="/services" element={
                   <ProtectedRoute>
                     <ServicePage />
                   </ProtectedRoute>
-                } />
-                <Route path="/services/new" element={
+                } /> */}
+                {/* <Route path="/services/new" element={
                   <ProtectedRoute>
                     <ServiceForm />
                   </ProtectedRoute>
-                } />
+                } /> */}
                 <Route path="/services/:id" element={<ServiceDetailPage />} />
-                <Route path="/services/:id/edit" element={
+                {/* <Route path="/services/:id/edit" element={
                   <ProtectedRoute>
                     <ServiceForm />
                   </ProtectedRoute>
-                } />
+                } /> */}
 
                 <Route path="/profile" element={
                   <ProtectedRoute>

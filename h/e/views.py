@@ -1,4 +1,5 @@
 from rest_framework import viewsets, generics
+from rest_framework.generics import RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
@@ -10,15 +11,37 @@ from rest_framework.response import Response
 from .models import Service
 from .ai_utils import generate_product_tags, enhance_description
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarityimport numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 from rest_framework.decorators import api_view
 from .tasks import async_generate_tags
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.decorators import throttle_classes
+from rest_framework.pagination import PageNumberPagination
+from django.contrib.auth import get_user_model
+from rest_framework.permissions import AllowAny
+from rest_framework.throttling import AnonRateThrottle
 
 class AITenPerMinute(UserRateThrottle):
     rate = '10/minute'
 
+class StandardPagination(PageNumberPagination):
+    page_size = 20  # Items per page
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+class RegisterView(generics.CreateAPIView):
+    queryset = get_user_model().objects.all()
+    serializer_class = UserSerializer  # Use your existing UserSerializer
+    permission_classes = [AllowAny]  # Allow unauthenticated access
+
+class UserDetailView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+    
+    def get_object(self):
+        return self.request.user
+    
 @api_view(['POST'])
 def generate_tags(request):
     text = request.data.get('text', '')
@@ -43,6 +66,7 @@ def get_tags_result(request, task_id):
         return Response({'status': 'processing'}, status=202)
 
 class BusinessViewSet(viewsets.ModelViewSet):
+    pagination_class = StandardPagination 
     queryset = Business.objects.all()
     serializer_class = BusinessSerializer
     permission_classes = [IsAuthenticated]
@@ -62,6 +86,7 @@ class BusinessViewSet(viewsets.ModelViewSet):
         return queryset
 
 class ProductViewSet(viewsets.ModelViewSet):
+    pagination_class = StandardPagination
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     
@@ -80,6 +105,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         return queryset
 
 class ServiceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]  # Add this
+    pagination_class = StandardPagination 
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
     
@@ -124,14 +151,9 @@ class ReviewViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    throttle_classes = [AnonRateThrottle]  
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-
-@api_view(['POST'])
-def generate_tags(request):
-    text = request.data.get('text', '')
-    tags = generate_product_tags(text)
-    return Response({'tags': tags})
 
 @api_view(['POST'])
 def enhance_description(request):
@@ -163,3 +185,27 @@ def service_suggestions(request):
     suggestions = [service_titles[i] for i in top_indices]
     
     return Response({'suggestions': suggestions})
+
+# Add to views.py
+class ServiceAvailabilityViewSet(viewsets.ModelViewSet):
+    queryset = Availability.objects.all()
+    serializer_class = AvailabilitySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(service__provider=self.request.user)
+
+class UserServicesView(generics.ListAPIView):
+    serializer_class = ServiceSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Service.objects.filter(provider=self.request.user)
+    
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def verify_service(request, pk):
+    service = get_object_or_404(Service, pk=pk)
+    service.verified = True
+    service.save()
+    return Response({'status': 'verified'})

@@ -14,7 +14,7 @@ from pathlib import Path
 import os
 import dj_database_url
 from dotenv import load_dotenv
-
+from datetime import timedelta
 # Load environment variables from .env file
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+AUTH_USER_MODEL = 'e.User'  # Replace 'e' with your actual app name
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-default-secret-key')
@@ -42,9 +43,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'e',
     'rest_framework',
+    'rest_framework_simplejwt',    
     'django_filters',
     'corsheaders',
     'rest_framework_gis',
+    'leaflet',
+    'djgeojson',
+    'django.contrib.gis',
 ]
 
 MIDDLEWARE = [
@@ -174,3 +179,35 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 # Celery Settings
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND')
+
+# Required for GeoDjango (GIS)
+GDAL_LIBRARY_PATH = '/usr/lib/libgdal.so'  # Use the symlink
+GEOS_LIBRARY_PATH = '/usr/lib/x86_64-linux-gnu/libgeos_c.so'  # Common path, verify if needed
+
+LEAFLET_CONFIG = {
+    'DEFAULT_CENTER': (0.0, 0.0),
+    'DEFAULT_ZOOM': 2,
+    'MIN_ZOOM': 3,
+    'MAX_ZOOM': 18,
+    'SCALE': 'both',
+    'ATTRIBUTION_PREFIX': 'GIS with Django',
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,    
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+    }
+}

@@ -1,15 +1,11 @@
-// src/components/ServiceList.jsx
+// src/components/service/ServiceList.jsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { 
-  Container, Row, Col, Card, Button, Form, 
-  Spinner, Alert, InputGroup, Badge 
-} from 'react-bootstrap';
-import { GeoAlt, Search, Funnel, ArrowRight } from 'react-bootstrap-icons';
+import { Container, Row, Col, Alert, Spinner, InputGroup, Form, Button, Badge, Card } from 'react-bootstrap';
+import { Search, Funnel, GeoAlt } from 'react-bootstrap-icons';
+import ServiceCard from './ServiceCard';
+import { serviceApi, categoryApi, aiApi } from '../../services/api';
 
-const API_BASE = 'http://localhost:8000/api';
-
-function ServiceList() {
+const ServiceList = () => {
   const [services, setServices] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,54 +19,55 @@ function ServiceList() {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [categories, setCategories] = useState([]);
 
-  // Get user location and services
   useEffect(() => {
-    // Get categories
-    axios.get(`${API_BASE}/categories/`)
-      .then(response => setCategories(response.data))
-      .catch(console.error);
-      
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
-          fetchServices(latitude, longitude);
-        },
-        err => {
-          console.error('Geolocation error:', err);
-          setError('Could not get your location. Using default location.');
+    const fetchData = async () => {
+      try {
+        // Get categories
+        const categoriesResponse = await categoryApi.getAll();
+        setCategories(categoriesResponse.data);
+        
+        // Get user location and services
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords;
+              setUserLocation({ lat: latitude, lng: longitude });
+              const servicesResponse = await serviceApi.getNearby(latitude, longitude, 20);
+              setServices(servicesResponse.data);
+              setFilteredServices(servicesResponse.data);
+              setLoading(false);
+            },
+            async (err) => {
+              console.error('Geolocation error:', err);
+              setError('Could not get your location. Using default location.');
+              setUserLocation({ lat: -1.2921, lng: 36.8219 });
+              const servicesResponse = await serviceApi.getNearby(-1.2921, 36.8219, 20);
+              setServices(servicesResponse.data);
+              setFilteredServices(servicesResponse.data);
+              setLoading(false);
+            }
+          );
+        } else {
+          setError('Geolocation is not supported by your browser.');
           setUserLocation({ lat: -1.2921, lng: 36.8219 });
-          fetchServices(-1.2921, 36.8219);
+          const servicesResponse = await serviceApi.getNearby(-1.2921, 36.8219, 20);
+          setServices(servicesResponse.data);
+          setFilteredServices(servicesResponse.data);
+          setLoading(false);
         }
-      );
-    } else {
-      setError('Geolocation is not supported by your browser.');
-      setUserLocation({ lat: -1.2921, lng: 36.8219 });
-      fetchServices(-1.2921, 36.8219);
-    }
-  }, []);
-
-  const fetchServices = (lat, lng, radius = 20) => {
-    setLoading(true);
-    axios.get(`${API_BASE}/services/?lat=${lat}&lng=${lng}&radius=${radius}`)
-      .then(response => {
-        setServices(response.data);
-        setFilteredServices(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error fetching services:', error);
+      } catch (err) {
+        console.error('Error fetching data:', err);
         setError('Failed to load services');
         setLoading(false);
-      });
-  };
+      }
+    };
 
-  // Apply filters
+    fetchData();
+  }, []);
+
   useEffect(() => {
     let result = services;
     
-    // Search term filter
     if (searchTerm) {
       result = result.filter(service => 
         service.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -78,14 +75,12 @@ function ServiceList() {
       );
     }
     
-    // Category filter
     if (category) {
       result = result.filter(service => 
         service.category?.name.toLowerCase() === category.toLowerCase()
       );
     }
     
-    // Price range filter
     if (priceRange) {
       const [min, max] = priceRange.split('-').map(Number);
       result = result.filter(service => {
@@ -99,22 +94,21 @@ function ServiceList() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    // Triggered when search form is submitted
+    // Search is handled by the useEffect
   };
 
-  const getAISuggestions = () => {
+  const getAISuggestions = async () => {
     if (!searchTerm) return;
     
     setAiLoading(true);
-    axios.post('/api/service-suggestions/', { text: searchTerm })
-      .then(response => {
-        setAiSuggestions(response.data.suggestions);
-        setAiLoading(false);
-      })
-      .catch(error => {
-        console.error('AI suggestions failed:', error);
-        setAiLoading(false);
-      });
+    try {
+      const response = await aiApi.getSuggestions(searchTerm);
+      setAiSuggestions(response.suggestions);
+    } catch (err) {
+      console.error('AI suggestions failed:', err);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const applyAISuggestion = (suggestion) => {
@@ -129,6 +123,22 @@ function ServiceList() {
     setFilteredServices(services);
   };
 
+  const expandSearch = async () => {
+    if (!userLocation) return;
+    
+    setLoading(true);
+    try {
+      const response = await serviceApi.getNearby(userLocation.lat, userLocation.lng, 50);
+      setServices(response.data);
+      setFilteredServices(response.data);
+    } catch (err) {
+      console.error('Error expanding search:', err);
+      setError('Failed to expand search area');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -141,7 +151,6 @@ function ServiceList() {
         </Button>
       </div>
 
-      {/* Search and Filters Section */}
       <Card className="mb-4 shadow-sm">
         <Card.Body>
           <Form onSubmit={handleSearch}>
@@ -228,7 +237,6 @@ function ServiceList() {
         </Card.Body>
       </Card>
 
-      {/* Location Info */}
       {userLocation && (
         <div className="d-flex align-items-center mb-3 text-muted">
           <GeoAlt className="me-2" />
@@ -239,14 +247,13 @@ function ServiceList() {
             variant="link" 
             size="sm" 
             className="ms-2"
-            onClick={() => fetchServices(userLocation.lat, userLocation.lng, 50)}
+            onClick={expandSearch}
           >
             Expand search area
           </Button>
         </div>
       )}
 
-      {/* Results */}
       {loading ? (
         <div className="text-center py-5">
           <Spinner animation="border" variant="primary" />
@@ -269,59 +276,6 @@ function ServiceList() {
       )}
     </Container>
   );
-}
-
-function ServiceCard({ service }) {
-  const [showDetails, setShowDetails] = useState(false);
-  
-  return (
-    <Card className="h-100 shadow-sm">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div>
-            <Card.Title className="mb-1">{service.title}</Card.Title>
-            {service.category && (
-              <Badge bg="secondary" className="mb-2">
-                {service.category.name}
-              </Badge>
-            )}
-          </div>
-          <div className="text-end">
-            <h5 className="text-primary mb-0">
-              {service.hourly_rate ? `KES ${service.hourly_rate}/hr` : `KES ${service.fixed_price}`}
-            </h5>
-          </div>
-        </div>
-        
-        <Card.Text className="text-muted">
-          {showDetails ? service.description : `${service.description.substring(0, 100)}...`}
-        </Card.Text>
-        
-        <div className="d-flex align-items-center text-muted small mb-3">
-          <GeoAlt className="me-1" />
-          <span>Within 20km of your location</span>
-        </div>
-        
-        <div className="d-flex justify-content-between">
-          <Button 
-            variant="link" 
-            size="sm" 
-            onClick={() => setShowDetails(!showDetails)}
-          >
-            {showDetails ? 'Show Less' : 'Show More'}
-          </Button>
-          <Button 
-            variant="primary" 
-            size="sm"
-            as="a"
-            href={`/services/${service.id}`}
-          >
-            Request Service <ArrowRight className="ms-1" />
-          </Button>
-        </div>
-      </Card.Body>
-    </Card>
-  );
-}
+};
 
 export default ServiceList;
